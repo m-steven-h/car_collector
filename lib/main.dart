@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:window_manager/window_manager.dart';
 import 'models/app_model.dart';
 import 'welcome.dart';
 import 'screens/home.dart';
@@ -9,14 +10,48 @@ import 'screens/collection.dart';
 import 'screens/profile.dart';
 import 'screens/add_car.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
+  // ✅ تهيئة window_manager لـ Windows
+  await windowManager.ensureInitialized();
+
+  const windowOptions = WindowOptions(
+    size: Size(420, 900),
+    minimumSize: Size(360, 640),
+    center: true,
+    backgroundColor: Colors.transparent,
+    skipTaskbar: false,
+    title: 'Car Collector',
+    titleBarStyle: TitleBarStyle.normal,
+  );
+
+  await windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+  });
+
+  // ✅ دالة تبديل الشاشة الكاملة
+  Future<void> toggleFullScreen() async {
+    final isFullScreen = await windowManager.isFullScreen();
+    await windowManager.setFullScreen(!isFullScreen);
+  }
+
+  // ✅ الاستماع لمفتاح F11
+  ServicesBinding.instance.keyboard.addHandler((KeyEvent event) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.f11) {
+      toggleFullScreen();
+      return true;
+    }
+    // ✅ الخروج من الشاشة الكاملة بـ Escape
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      windowManager.isFullScreen().then((value) {
+        if (value) windowManager.setFullScreen(false);
+      });
+    }
+    return false;
+  });
 
   runApp(const MyApp());
 }
@@ -170,13 +205,13 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  // ✅ مقاسات ثابتة لا تتغير أبدًا على أي جهاز
-  static const double _barHeight = 68; // ارتفاع الشريط
-  static const double _addButtonSize = 68; // حجم زر الإضافة (مربع)
-  static const double _bottomMargin = 16; // المسافة من الأسفل
-  static const double _sideMargin = 16; // المسافة من الجانبين
-  static const double _gap = 12; // المسافة بين الشريط والزر
-  static const double _maxTotalWidth = 500; // الحد الأقصى لعرض الشريط+الزر معًا
+  // ✅ مقاسات ثابتة
+  static const double _barHeight = 68;
+  static const double _addButtonSize = 68;
+  static const double _bottomMargin = 16;
+  static const double _sideMargin = 16;
+  static const double _gap = 12;
+  static const double _maxTotalWidth = 500;
 
   final List<Widget> _pages = const [
     HomeScreen(),
@@ -204,7 +239,7 @@ class _MainShellState extends State<MainShell> {
             child: IndexedStack(index: _selectedIndex, children: _pages),
           ),
 
-          // ✅ الشريط بمقاس ثابت: ارتفاع 68px، عرض محدود بـ 500px كحد أقصى
+          // ✅ الشريط بمقاس ثابت
           Positioned(
             left: 0,
             right: 0,
@@ -215,17 +250,13 @@ class _MainShellState extends State<MainShell> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: _sideMargin),
                   child: SizedBox(
-                    // ✅ ارتفاع صريح ثابت لكل الصف
                     height: _barHeight,
                     child: Row(
-                      // ✅ مهم جدًا: منع الصف من التمدد
                       mainAxisSize: MainAxisSize.max,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // شريط التنقل يأخذ المساحة المتبقية بعد الزر
                         Expanded(child: _buildFloatingNavigationBar(lang)),
                         const SizedBox(width: _gap),
-                        // زر الإضافة بمقاس ثابت
                         _buildAddButton(),
                       ],
                     ),
@@ -243,7 +274,6 @@ class _MainShellState extends State<MainShell> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      // ✅ ارتفاع صريح ثابت
       height: _barHeight,
       decoration: BoxDecoration(
         color: isDark
@@ -317,7 +347,6 @@ class _MainShellState extends State<MainShell> {
             MaterialPageRoute(builder: (_) => const AddCarScreen()),
           );
         },
-        // ✅ حجم ثابت 68×68 بالضبط
         child: SizedBox(
           width: _addButtonSize,
           height: _addButtonSize,
@@ -369,8 +398,7 @@ class _MainShellState extends State<MainShell> {
           },
           borderRadius: BorderRadius.circular(24),
           child: SizedBox(
-            // ✅ ارتفاع صريح ثابت للعنصر الداخلي
-            height: _barHeight - 12, // ناقص padding العمودي (6+6)
+            height: _barHeight - 12,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
